@@ -2551,11 +2551,11 @@ const CSS = `
 .qx{font-size:14px}
 .qx-tabs{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid #e6e2da;margin-bottom:12px;-webkit-overflow-scrolling:touch}
 .qx-tabs button{background:none;border:0;border-bottom:2px solid transparent;color:#4a524e;padding:9px 12px;font-weight:500;font:inherit;white-space:nowrap;cursor:pointer;border-radius:0}
-.qx-tabs button.on{color:#2f5d4e;border-bottom-color:#2f5d4e;font-weight:700}
+.qx-tabs button.on{color:#2e7a55;border-bottom-color:#2e7a55;font-weight:700}
 .qx-pane{display:none}.qx-pane.on{display:block}
 .qx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:8px}
 .qx-opt{background:#fff;border:1.5px solid #e6e2da;border-radius:12px;padding:8px 6px 6px;transition:border-color .15s,background .15s;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;color:#555}
-.qx-opt.on{border-color:#2f5d4e;background:#e7efeb;color:#244a3e;font-weight:700}
+.qx-opt.on{border-color:#2e7a55;background:#e4eedf;color:#256646;font-weight:700}
 .qx-opt svg{width:100%;height:auto;max-width:72px}
 .qx-row{display:grid;grid-template-columns:96px 1fr;gap:10px;align-items:center;margin:10px 0}
 .qx-row label{color:#555}
@@ -2564,7 +2564,7 @@ const CSS = `
 .qx input[type=range]{width:100%}
 .qx-seg{display:flex;flex-wrap:wrap;gap:6px}
 .qx-seg button{background:#fff;color:#2b2b2b;border:1px solid #e6e2da;border-radius:8px;padding:6px 11px;font:inherit;font-size:13px;cursor:pointer}
-.qx-seg button.on{background:#2f5d4e;color:#fff;border-color:#2f5d4e}
+.qx-seg button.on{background:#2e7a55;color:#fff;border-color:#2e7a55}
 .qx-h{font-weight:700;margin:14px 0 6px;color:#333}
 .qx-note{color:#888;font-size:12px;margin-top:6px}
 .qx-logo{display:flex;gap:10px;align-items:center}
@@ -2572,7 +2572,18 @@ const CSS = `
 .qx-logo .pv img{max-width:100%;max-height:100%}
 
 .qx-opt:hover{border-color:#d9d4ca;background:#faf9f6}
-.qx input[type=range]{accent-color:#2f5d4e}
+.qx input[type=range]{accent-color:#2e7a55}
+
+.qx-opt{background:#fffef9;border-color:#e2ddcb;border-radius:6px}
+.qx-opt.on{background:#e4eedf}
+.qx-seg button{border-radius:999px;background:transparent;border-color:#d3cdb6;color:#4e5548;box-shadow:none;font-weight:500;padding:6px 13px}
+.qx-seg button.on,.qx-seg button.on:hover{background:linear-gradient(110deg,#2a7a5a,#3c8a4c);border-color:transparent;color:#fff}
+.qx-tabs{border-color:#e2ddcb}
+.qx-tabs button{box-shadow:none;letter-spacing:.1em;padding:9px 12px;border-radius:0;background:none}
+.qx-tabs button.on{color:#2e7a55;border-bottom-color:#2e7a55}
+.qx-h{color:#3f7d45;letter-spacing:.12em}
+.qx-row label{color:#3f7d45}
+.qx input[type=text]{background:#fffef9;border-color:#d3cdb6;border-radius:6px}
 `;
 
 function editor(root, opts){
