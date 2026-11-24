@@ -2306,7 +2306,7 @@ const DEFAULT = {
   fill:'solid', fg:'#000000', fg2:'#3d6b5a', angle:45,
   customEye:false, eyeOuterColor:'#000000', eyeInnerColor:'#000000',
   bg:'#ffffff', transparent:false,
-  logo:'', logoSize:0.22, logoPlate:true, ec:'M', margin:4, dotSize:1,
+  logo:'', logoSize:0.22, logoPlate:true, ec:'M', margin:4, dotSize:1, version:0,
   frame:'none', frameColor:'#000000', frameText:'SCAN ME'
 };
 
@@ -2379,7 +2379,15 @@ function build(text, st){
   const order = ['L','M','Q','H'];
   let ec = order.indexOf(st.ec) < 0 ? 1 : order.indexOf(st.ec);
   if (st.logo) ec = Math.max(ec, 1); // 有 logo 時至少「標準」，其餘由使用者決定
-  const q = qrcode(0, order[ec]); q.addData(text || ' '); q.make();
+  // 格數：0 = 自動用最小尺寸；指定尺寸時，在裝得下的前提下自動用最高容錯（更耐髒）
+  let q = null;
+  const want = Math.max(0, Math.min(40, Math.round(+st.version || 0)));
+  if (want){
+    for (let e = 3; e >= ec && !q; e--){
+      try { const t = qrcode(want, order[e]); t.addData(text || ' '); t.make(); q = t; ec = e; } catch (err) {}
+    }
+  }
+  if (!q){ q = qrcode(0, order[ec]); q.addData(text || ' '); q.make(); }
   const n = q.getModuleCount(), Q = Math.max(1, Math.min(8, Math.round(+st.margin >= 0 ? +st.margin : 4))), S = n + Q*2;
   const dark = (r, c) => r >= 0 && c >= 0 && r < n && c < n && q.isDark(r, c);
   const inEye = (r, c) => (r < 7 && c < 7) || (r < 7 && c >= n-7) || (r >= n-7 && c < 7);
@@ -2647,7 +2655,10 @@ function editor(root, opts){
     <div class="qx-pane on" data-p="tpl"><div class="qx-grid">${TEMPLATES.map(([name, p], i) => `<div class="qx-opt" data-tpl="${i}">${thumb(Object.assign({frameText:'SCAN'}, p))}<span>${name}</span></div>`).join('')}</div>
       <div class="qx-note">套用範本會覆蓋目前的樣式（logo 會保留）。</div></div>
     <div class="qx-pane" data-p="pat"><div class="qx-grid">${PATTERNS.map(([v,l]) => opt('pattern', v, l, patThumb(v))).join('')}</div>
-      <div class="qx-h">點的密度（容錯率）</div>
+      <div class="qx-h">細緻度（格數）</div>
+      <div class="qx-row" style="margin:4px 0"><label data-vlabel></label><input type="range" min="1" max="40" step="1" data-r="version"></div>
+      <div class="qx-note" data-vnote>往左最疏（最少點）；往右格子變多、看起來更細緻，多出來的空間會自動用來提高容錯，更耐髒污。</div>
+      <div class="qx-h">最低容錯率</div>
       ${seg('ec', [['L','最疏'],['M','標準'],['Q','較密'],['H','最密']])}
       <div class="qx-note" data-ecinfo></div>
       <div class="qx-h">點的大小</div>
@@ -2699,6 +2710,19 @@ function editor(root, opts){
     $$('.qx-gl').forEach(e => e.style.display = st.fill === 'linear' ? '' : 'none');
     $$('.qx-e').forEach(e => e.style.display = st.customEye ? '' : 'none');
     root.querySelector('[data-mlabel]').textContent = st.margin + ' 格';
+    if (opts.text){
+      const text = opts.text() || ' ';
+      const base = build(text, Object.assign({}, st, { version: 0, frame:'none' }));
+      const vmin = (base.n - 17) / 4, vmax = Math.min(40, vmin + 10);
+      const vr = root.querySelector('[data-r="version"]');
+      vr.min = vmin; vr.max = vmax;
+      const cur = st.version && st.version >= vmin ? Math.min(st.version, vmax) : vmin;
+      vr.value = cur;
+      const now = build(text, Object.assign({}, st, { version: cur === vmin ? 0 : cur, frame:'none' }));
+      const ecName = { L:'最低', M:'標準', Q:'較高', H:'最高' }[now.info.ec];
+      root.querySelector('[data-vlabel]').textContent = now.n + '×' + now.n;
+      root.querySelector('[data-vnote]').textContent = '目前 ' + now.n + '×' + now.n + '，容錯率自動用到「' + ecName + '」。往左最疏（最少點）；往右格子變多、看起來更細緻，多出來的空間會自動提高容錯，更耐髒污。';
+    }
     root.querySelector('[data-dlabel]').textContent = Math.round((+st.dotSize || 1) * 100) + '%';
     root.querySelector('[data-llabel]').textContent = '大小 ' + Math.round((+st.logoSize || 0.22) * 100) + '%';
     const rbox = root.querySelector('[data-risk]');
@@ -2708,16 +2732,7 @@ function editor(root, opts){
       rbox.innerHTML = '<div class="qx-meter ' + rk.level + '"><i style="width:' + pct + '%"></i></div>'
         + '<div class="qx-rt ' + rk.level + '"><b>' + rk.label + '</b><br>' + rk.text + '。</div>';
     } else rbox.innerHTML = st.logo ? '' : '<div class="qx-note">上傳 logo 後，這裡會顯示讀不到的風險。</div>';
-    if (opts.text){ // 顯示每個密度實際的格數
-      const text = opts.text() || ' ', info = {};
-      ['L','M','Q','H'].forEach(ec => { try { info[ec] = build(text, Object.assign({}, st, { ec, frame:'none' })).n; } catch (e) {} });
-      const names = { L:'最疏', M:'標準', Q:'較密', H:'最密' };
-      root.querySelectorAll('.qx-seg[data-k="ec"] button').forEach(b => { b.textContent = names[b.dataset.v] + (info[b.dataset.v] ? ' ' + info[b.dataset.v] + '×' + info[b.dataset.v] : ''); });
-      const same = info.L === info.M || info.M === info.Q;
-      root.querySelector('[data-ecinfo]').textContent =
-        (st.logo ? '有 logo 時最低為「標準」；logo 越大，建議選越密。' : '')
-        + (same ? '格數一樣代表這段網址剛好落在同一個尺寸，圖案只會有些微不同；網址再短一點，差異才會出來。' : '');
-    }
+    root.querySelector('[data-ecinfo]').textContent = '容錯率越高越耐髒污，但點會變多。' + (st.logo ? '有 logo 時最低為「標準」。' : '') + '拉大格數時，系統會在這個基礎上自動再提高。';
     root.querySelector('[data-logopv]').innerHTML = st.logo ? `<img src="${st.logo}">` : '<span style="color:#bbb;font-size:12px">無</span>';
   }
   const fire = () => { sync(); opts.onChange && opts.onChange(Object.assign({}, st)); };
@@ -2739,7 +2754,7 @@ function editor(root, opts){
   root.addEventListener('input', e => {
     const i = e.target;
     if (i.dataset.c){ st[i.dataset.c] = i.value; fire(); }
-    if (i.dataset.r){ st[i.dataset.r] = +i.value; fire(); }
+    if (i.dataset.r){ st[i.dataset.r] = (i.dataset.r === 'version' && +i.value === +i.min) ? 0 : +i.value; fire(); }
     if (i.dataset.tx !== undefined){ st[i.dataset.tx] = i.value; fire(); }
   });
   root.querySelector('[data-file]').addEventListener('change', e => {
