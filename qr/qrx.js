@@ -2584,6 +2584,9 @@ const CSS = `
 .qx-h{color:#3f7d45;letter-spacing:.12em}
 .qx-row label{color:#3f7d45}
 .qx input[type=text]{background:#fffef9;border-color:#d3cdb6;border-radius:6px}
+
+.qx-h,.qx-row label{color:#4e5548}
+.qx-opt.on{background:#f1efe3;border-color:#2e7a55;color:#2b2f27}
 `;
 
 function editor(root, opts){
