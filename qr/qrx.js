@@ -2598,6 +2598,7 @@ function editor(root, opts){
     <div class="qx-pane" data-p="pat"><div class="qx-grid">${PATTERNS.map(([v,l]) => opt('pattern', v, l, patThumb(v))).join('')}</div>
       <div class="qx-h">點的密度（容錯率）</div>
       ${seg('ec', [['L','最疏'],['M','標準'],['Q','較密'],['H','最密']])}
+      <div class="qx-note" data-ecinfo></div>
       <div class="qx-note">越疏點越少、越好掃，但比較不耐髒污折損；加 logo 時會自動調到「較密」以上。網址越短，點也會越少。</div>
       <div class="qx-h">四周留白</div>
       <div class="qx-row" style="margin:4px 0"><label data-mlabel></label><input type="range" min="1" max="8" step="1" data-r="margin"></div>
@@ -2643,6 +2644,16 @@ function editor(root, opts){
     $$('.qx-gl').forEach(e => e.style.display = st.fill === 'linear' ? '' : 'none');
     $$('.qx-e').forEach(e => e.style.display = st.customEye ? '' : 'none');
     root.querySelector('[data-mlabel]').textContent = st.margin + ' 格';
+    if (opts.text){ // 顯示每個密度實際的格數
+      const text = opts.text() || ' ', info = {};
+      ['L','M','Q','H'].forEach(ec => { try { info[ec] = build(text, Object.assign({}, st, { ec, frame:'none' })).n; } catch (e) {} });
+      const names = { L:'最疏', M:'標準', Q:'較密', H:'最密' };
+      root.querySelectorAll('.qx-seg[data-k="ec"] button').forEach(b => { b.textContent = names[b.dataset.v] + (info[b.dataset.v] ? ' ' + info[b.dataset.v] + '×' + info[b.dataset.v] : ''); });
+      const same = info.L === info.M || info.M === info.Q;
+      root.querySelector('[data-ecinfo]').textContent =
+        (st.logo ? '有 logo 時會自動提高到「較密」以上，所以前幾個選項結果一樣。' : '')
+        + (same ? '格數一樣代表這段網址剛好落在同一個尺寸，圖案只會有些微不同；網址再短一點，差異才會出來。' : '');
+    }
     root.querySelector('[data-logopv]').innerHTML = st.logo ? `<img src="${st.logo}">` : '<span style="color:#bbb;font-size:12px">無</span>';
   }
   const fire = () => { sync(); opts.onChange && opts.onChange(Object.assign({}, st)); };
