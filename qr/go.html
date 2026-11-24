@@ -35,7 +35,8 @@ fetch(API + '?' + q)
   .then(r => r.json())
   .then(d => {
     if (d.url) location.replace(d.url);
-    else document.getElementById('msg').textContent = '找不到這個連結';
+    else if (d.disabled && d.fallback) location.replace(d.fallback);
+    else document.getElementById('msg').textContent = d.disabled ? d.message : '找不到這個連結';
   })
   .catch(() => { document.getElementById('msg').textContent = '連線失敗，請重新整理再試一次'; });
 </script>
