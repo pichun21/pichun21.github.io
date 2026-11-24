@@ -2306,7 +2306,7 @@ const DEFAULT = {
   fill:'solid', fg:'#000000', fg2:'#3d6b5a', angle:45,
   customEye:false, eyeOuterColor:'#000000', eyeInnerColor:'#000000',
   bg:'#ffffff', transparent:false,
-  logo:'', logoSize:0.22, logoPlate:true, ec:'M', margin:4, dotSize:1, version:0,
+  logo:'', logoSize:0.22, logoPlate:true, logoX:0, logoY:0, ec:'M', margin:4, dotSize:1, version:0,
   frame:'none', frameColor:'#000000', frameText:'SCAN ME'
 };
 
@@ -2378,7 +2378,6 @@ function build(text, st){
   st = Object.assign({}, DEFAULT, st || {});
   const order = ['L','M','Q','H'];
   let ec = order.indexOf(st.ec) < 0 ? 1 : order.indexOf(st.ec);
-  if (st.logo) ec = Math.max(ec, 1); // 有 logo 時至少「標準」，其餘由使用者決定
   // 格數：0 = 自動用最小尺寸；指定尺寸時，在裝得下的前提下自動用最高容錯（更耐髒）
   let q = null;
   const want = Math.max(0, Math.min(40, Math.round(+st.version || 0)));
@@ -2395,9 +2394,9 @@ function build(text, st){
   // logo 區
   let lg = null;
   if (st.logo){
-    const sz = Math.max(5, Math.round(n * Math.min(0.3, Math.max(0.12, +st.logoSize || 0.22))));
-    const lo = (n - sz) / 2;
-    lg = { x: lo, y: lo, s: sz };
+    const sz = Math.max(3, Math.round(n * Math.min(0.3, Math.max(0.08, +st.logoSize || 0.22))));
+    const lo = (n - sz) / 2, lim = (a, v) => Math.max(8, Math.min(n - 8 - sz, v)); // 不能蓋到三個定位角
+    lg = { x: lim(0, lo + (+st.logoX || 0) * n), y: lim(0, lo + (+st.logoY || 0) * n), s: sz };
   }
   const covered = (r, c) => lg && (c + 0.5) > lg.x - 0.6 && (c + 0.5) < lg.x + lg.s + 0.6 && (r + 0.5) > lg.y - 0.6 && (r + 0.5) < lg.y + lg.s + 0.6;
   const on = (r, c) => dark(r, c) && !inEye(r, c) && !covered(r, c);
@@ -2552,24 +2551,23 @@ function logoRisk(info){
   const ratio = info.cov / info.cap;
   const level = ratio < 0.45 ? 'ok' : ratio < 0.75 ? 'warn' : 'bad';
   return { level, ratio, cov: Math.round(info.cov * 100), cap: Math.round(info.cap * 100),
-    text: 'logo 蓋住約 ' + Math.round(info.cov * 100) + '% 的點，目前容錯率最多可修復約 ' + Math.round(info.cap * 100) + '%',
+    text: 'logo 蓋住約 ' + (Math.round(info.cov * 1000) / 10) + '% 的點，目前容錯率最多可修復約 ' + Math.round(info.cap * 100) + '%',
     label: level === 'ok' ? '風險低' : level === 'warn' ? '風險中：印刷有髒污或反光時可能讀不到' : '風險高：很可能讀不到，請縮小 logo 或調密' };
 }
 function warnings(st, info){
   st = Object.assign({}, DEFAULT, st || {});
-  const bg = st.transparent ? '#ffffff' : st.bg;
-  const cols = [st.fg].concat(st.fill !== 'solid' ? [st.fg2] : []).concat(st.customEye ? [st.eyeOuterColor, st.eyeInnerColor] : []);
-  const worst = Math.min.apply(null, cols.map(c => contrast(c, bg)));
-  if (worst < 3) return '⚠️ 顏色對比太低，可能掃不到';
-  if (cols.some(c => lum(c) > lum(bg))) return '⚠️ 淺色點配深色底，部分手機可能掃不到';
+  const out = [], bg = st.transparent ? '#ffffff' : st.bg;
   if (st.logo){
     const rk = logoRisk(info || LAST);
-    if (rk && rk.level === 'bad') return '⚠️ ' + rk.text + '，' + rk.label;
-    if (rk && rk.level === 'warn') return '⚠️ ' + rk.text + '，' + rk.label;
+    if (rk && rk.level !== 'ok') out.push('⚠️ ' + rk.text + '，' + rk.label);
   }
-  if ((+st.dotSize || 1) < 0.7) return '⚠️ 點縮得很小，遠距離或印刷較小時可能讀不到';
-  if (st.transparent) return '透明背景：請放在淺色底上使用';
-  return '';
+  const cols = [st.fg].concat(st.fill !== 'solid' ? [st.fg2] : []).concat(st.customEye ? [st.eyeOuterColor, st.eyeInnerColor] : []);
+  const worst = Math.min.apply(null, cols.map(c => contrast(c, bg)));
+  if (worst < 3) out.push('⚠️ 顏色對比太低，可能掃不到');
+  else if (cols.some(c => lum(c) > lum(bg))) out.push('⚠️ 淺色點配深色底（反白），部分舊手機或掃描 App 讀不到');
+  if ((+st.dotSize || 1) < 0.7) out.push('⚠️ 點縮得很小，遠距離或印刷較小時可能讀不到');
+  if (!out.length && st.transparent) out.push('透明背景：請放在淺色底上使用');
+  return out.join('\n');
 }
 
 function normalize(st){ // 相容舊版設定
@@ -2629,6 +2627,8 @@ const CSS = `
 .qx-meter.warn i{background:#c58a00}.qx-meter.bad i{background:#b42318}
 .qx-rt{font-size:12.5px;margin-top:6px;line-height:1.6;color:#2e7a55}
 .qx-rt.warn{color:#9a6700}.qx-rt.bad{color:#b42318}
+
+#warn{white-space:pre-line;line-height:1.6}
 `;
 
 function editor(root, opts){
@@ -2687,9 +2687,12 @@ function editor(root, opts){
       <div class="qx-logo"><div class="pv" data-logopv></div>
         <div class="qx-seg"><button type="button" data-act="pick">上傳圖片</button><button type="button" data-act="rm">移除</button></div>
         <input type="file" accept="image/*" data-file style="display:none"></div>
-      <div class="qx-row"><label data-llabel>大小</label><input type="range" min="0.1" max="0.3" step="0.01" data-r="logoSize"></div>
+      <div class="qx-row"><label data-llabel>大小</label><input type="range" min="0.08" max="0.3" step="0.01" data-r="logoSize"></div>
       <div class="qx-risk" data-risk></div>
-      <div class="qx-row"><label>容錯率</label>${seg('ec', [['M','標準'],['Q','較密'],['H','最密']])}</div>
+      <div class="qx-row"><label>容錯率</label>${seg('ec', [['L','最低 7%'],['M','標準 15%'],['Q','較高 25%'],['H','最高 30%']])}</div>
+      <div class="qx-row"><label data-xlabel>水平位置</label><input type="range" min="-0.3" max="0.3" step="0.01" data-r="logoX"></div>
+      <div class="qx-row"><label data-ylabel>垂直位置</label><input type="range" min="-0.3" max="0.3" step="0.01" data-r="logoY"></div>
+      <div class="qx-seg" style="margin:-2px 0 8px 106px"><button type="button" data-act="center">回到正中央</button></div>
       <div class="qx-row"><label>logo 底板</label>${seg('logoPlate', [['true','有'],['false','無']])}</div>
       <div class="qx-note">紅色代表很可能讀不到：把 logo 縮小，或把容錯率調高到紅字消失。正式印刷前請一定用手機實際掃過。</div>
     </div>
@@ -2724,6 +2727,9 @@ function editor(root, opts){
       root.querySelector('[data-vnote]').textContent = '目前 ' + now.n + '×' + now.n + '，容錯率自動用到「' + ecName + '」。往左最疏（最少點）；往右格子變多、看起來更細緻，多出來的空間會自動提高容錯，更耐髒污。';
     }
     root.querySelector('[data-dlabel]').textContent = Math.round((+st.dotSize || 1) * 100) + '%';
+    const pos = v => { v = Math.round((+v || 0) * 100); return v === 0 ? '置中' : (v > 0 ? '+' : '') + v + '%'; };
+    root.querySelector('[data-xlabel]').textContent = '水平 ' + pos(st.logoX);
+    root.querySelector('[data-ylabel]').textContent = '垂直 ' + pos(st.logoY);
     root.querySelector('[data-llabel]').textContent = '大小 ' + Math.round((+st.logoSize || 0.22) * 100) + '%';
     const rbox = root.querySelector('[data-risk]');
     if (st.logo && opts.text){
@@ -2732,7 +2738,7 @@ function editor(root, opts){
       rbox.innerHTML = '<div class="qx-meter ' + rk.level + '"><i style="width:' + pct + '%"></i></div>'
         + '<div class="qx-rt ' + rk.level + '"><b>' + rk.label + '</b><br>' + rk.text + '。</div>';
     } else rbox.innerHTML = st.logo ? '' : '<div class="qx-note">上傳 logo 後，這裡會顯示讀不到的風險。</div>';
-    root.querySelector('[data-ecinfo]').textContent = '容錯率越高越耐髒污，但點會變多。' + (st.logo ? '有 logo 時最低為「標準」。' : '') + '拉大格數時，系統會在這個基礎上自動再提高。';
+    root.querySelector('[data-ecinfo]').textContent = '容錯率越高越耐髒污，但點會變多。' + (st.logo ? '有 logo 時請看 Logo 分頁的風險條。' : '') + '拉大格數時，系統會在這個基礎上自動再提高。';
     root.querySelector('[data-logopv]').innerHTML = st.logo ? `<img src="${st.logo}">` : '<span style="color:#bbb;font-size:12px">無</span>';
   }
   const fire = () => { sync(); opts.onChange && opts.onChange(Object.assign({}, st)); };
@@ -2750,6 +2756,7 @@ function editor(root, opts){
     const act = e.target.closest('[data-act]');
     if (act && act.dataset.act === 'pick') root.querySelector('[data-file]').click();
     if (act && act.dataset.act === 'rm'){ st.logo = ''; fire(); }
+    if (act && act.dataset.act === 'center'){ st.logoX = 0; st.logoY = 0; fire(); }
   });
   root.addEventListener('input', e => {
     const i = e.target;
