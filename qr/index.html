@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>轉址中…</title>
+<style>body{font:16px -apple-system,"PingFang TC","Noto Sans TC",sans-serif;display:flex;align-items:center;justify-content:center;height:90vh;margin:0;color:#888}</style>
+</head>
+<body>
+<p id="msg">轉址中…</p>
+<script>
+// 短網址轉址頁：網址格式 https://你的帳號.github.io/qr/?代碼
+// ⚠️ 把下面換成你的 Apps Script 網址（結尾是 /exec）
+const MY_API = '';
+
+const params = new URLSearchParams(location.search);
+const sid = params.get('s') || '';
+const raw = location.search.slice(1);
+const id = params.get('id') || (raw && raw.indexOf('=') < 0 ? decodeURIComponent(raw) : '');
+const API = /^[\w-]{20,}$/.test(sid) ? 'https://script.google.com/macros/s/' + sid + '/exec' : MY_API;
+if (!API || !id) { document.getElementById('msg').textContent = '連結格式錯誤'; throw new Error('bad link'); }
+const ua = navigator.userAgent;
+const touchMac = /Macintosh/.test(ua) && navigator.maxTouchPoints > 1;
+const os = /iPhone|iPad|iPod/.test(ua) || touchMac ? 'iOS / iPadOS' : /Android/.test(ua) ? 'Android'
+  : /Windows/.test(ua) ? 'Windows' : /Mac OS X/.test(ua) ? 'macOS' : /Linux/.test(ua) ? 'Linux' : '其他';
+const device = /iPad|Tablet/.test(ua) || touchMac || (/Android/.test(ua) && !/Mobile/.test(ua)) ? '平板'
+  : /Mobi|iPhone|Android/.test(ua) ? '手機' : '電腦';
+const browser = /Line\//.test(ua) ? 'LINE' : /FBAN|FBAV|Instagram/.test(ua) ? 'FB / IG'
+  : /Edg\//.test(ua) ? 'Edge' : /CriOS|Chrome\//.test(ua) ? 'Chrome'
+  : /Safari\//.test(ua) ? 'Safari' : /Firefox|FxiOS/.test(ua) ? 'Firefox' : '其他';
+let vid = '';
+try { vid = localStorage.getItem('qr_vid') || ''; if (!vid) { vid = Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('qr_vid', vid); } } catch (e) {}
+
+const q = new URLSearchParams({ api: 'go', id, vid, device, os, browser,
+  lang: navigator.language, tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  screen: screen.width + 'x' + screen.height });
+
+fetch(API + '?' + q)
+  .then(r => r.json())
+  .then(d => {
+    if (d.url) location.replace(d.url);
+    else document.getElementById('msg').textContent = '找不到這個連結';
+  })
+  .catch(() => { document.getElementById('msg').textContent = '連線失敗，請重新整理再試一次'; });
+</script>
+</body>
+</html>

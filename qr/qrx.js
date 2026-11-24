@@ -7,7 +7,7 @@ const DEFAULT = {
   fill:'solid', fg:'#000000', fg2:'#3d6b5a', angle:45,
   customEye:false, eyeOuterColor:'#000000', eyeInnerColor:'#000000',
   bg:'#ffffff', transparent:false,
-  logo:'', logoSize:0.22, logoPlate:true,
+  logo:'', logoSize:0.22, logoPlate:true, ec:'M', margin:4,
   frame:'none', frameColor:'#000000', frameText:'SCAN ME'
 };
 
@@ -77,8 +77,11 @@ let GID = 0;
 function build(text, st){
   const gid = 'qg' + (++GID) + Math.random().toString(36).slice(2, 6);
   st = Object.assign({}, DEFAULT, st || {});
-  const q = qrcode(0, st.logo ? 'H' : 'Q'); q.addData(text || ' '); q.make();
-  const n = q.getModuleCount(), Q = 4, S = n + Q*2;
+  const order = ['L','M','Q','H'];
+  let ec = order.indexOf(st.ec) < 0 ? 1 : order.indexOf(st.ec);
+  if (st.logo) ec = Math.max(ec, (+st.logoSize || 0.22) > 0.22 ? 3 : 2); // 有 logo 時自動提高容錯
+  const q = qrcode(0, order[ec]); q.addData(text || ' '); q.make();
+  const n = q.getModuleCount(), Q = Math.max(1, Math.min(8, Math.round(+st.margin >= 0 ? +st.margin : 4))), S = n + Q*2;
   const dark = (r, c) => r >= 0 && c >= 0 && r < n && c < n && q.isDark(r, c);
   const inEye = (r, c) => (r < 7 && c < 7) || (r < 7 && c >= n-7) || (r >= n-7 && c < 7);
 
@@ -158,7 +161,7 @@ function build(text, st){
     const pad = 0.4, plateFill = st.transparent ? '#ffffff' : st.bg;
     if (st.logoPlate) qr += `<rect x="${f(Q+lg.x-pad)}" y="${f(Q+lg.y-pad)}" width="${f(lg.s+pad*2)}" height="${f(lg.s+pad*2)}" rx="${f(lg.s*0.18)}" fill="${plateFill}"/>`;
     const ins = st.logoPlate ? lg.s * 0.06 : 0;
-    qr += `<image href="${st.logo}" x="${f(Q+lg.x+ins)}" y="${f(Q+lg.y+ins)}" width="${f(lg.s-ins*2)}" height="${f(lg.s-ins*2)}" preserveAspectRatio="xMidYMid meet"/>`;
+    qr += `<image href="${st.logo}" xlink:href="${st.logo}" x="${f(Q+lg.x+ins)}" y="${f(Q+lg.y+ins)}" width="${f(lg.s-ins*2)}" height="${f(lg.s-ins*2)}" preserveAspectRatio="xMidYMid meet"/>`;
   }
 
   // 外框
@@ -198,7 +201,7 @@ function build(text, st){
   }
 
   const inner = (fr === 'none' ? qrBg : '') + qr;
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${f(W)} ${f(H)}" width="${f(W*10)}" height="${f(H*10)}">`
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ${f(W)} ${f(H)}" width="${f(W*10)}" height="${f(H*10)}">`
     + (defs ? `<defs>${defs}</defs>` : '')
     + body
     + `<g transform="translate(${f(ox)} ${f(oy)})">${inner}</g></svg>`;
@@ -214,6 +217,7 @@ function toPNG(text, st, width, jpg){
       const c = document.createElement('canvas');
       c.width = Math.round(b.w * scale); c.height = Math.round(b.h * scale);
       const x = c.getContext('2d');
+      x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
       if (jpg){ x.fillStyle = '#ffffff'; x.fillRect(0, 0, c.width, c.height); }
       x.drawImage(img, 0, 0, c.width, c.height);
       res(c.toDataURL(jpg ? 'image/jpeg' : 'image/png', 0.95));
@@ -292,7 +296,14 @@ function editor(root, opts){
     </div>
     <div class="qx-pane on" data-p="tpl"><div class="qx-grid">${TEMPLATES.map(([name, p], i) => `<div class="qx-opt" data-tpl="${i}">${thumb(Object.assign({frameText:'SCAN'}, p))}<span>${name}</span></div>`).join('')}</div>
       <div class="qx-note">套用範本會覆蓋目前的樣式（logo 會保留）。</div></div>
-    <div class="qx-pane" data-p="pat"><div class="qx-grid">${PATTERNS.map(([v,l]) => opt('pattern', v, l, patThumb(v))).join('')}</div></div>
+    <div class="qx-pane" data-p="pat"><div class="qx-grid">${PATTERNS.map(([v,l]) => opt('pattern', v, l, patThumb(v))).join('')}</div>
+      <div class="qx-h">點的密度（容錯率）</div>
+      ${seg('ec', [['L','最疏'],['M','標準'],['Q','較密'],['H','最密']])}
+      <div class="qx-note">越疏點越少、越好掃，但比較不耐髒污折損；加 logo 時會自動調到「較密」以上。網址越短，點也會越少。</div>
+      <div class="qx-h">四周留白</div>
+      <div class="qx-row" style="margin:4px 0"><label data-mlabel></label><input type="range" min="1" max="8" step="1" data-r="margin"></div>
+      <div class="qx-note">建議至少 2 格，印刷時旁邊有其他圖文就留 4 格。</div>
+    </div>
     <div class="qx-pane" data-p="eye">
       <div class="qx-h">外框</div><div class="qx-grid">${EYE_OUTER.map(([v,l]) => opt('eyeOuter', v, l, eyeThumb(v, 'square'))).join('')}</div>
       <div class="qx-h">內心</div><div class="qx-grid">${EYE_INNER.map(([v,l]) => opt('eyeInner', v, l, eyeThumb('square', v))).join('')}</div>
@@ -332,6 +343,7 @@ function editor(root, opts){
     $$('.qx-g').forEach(e => e.style.display = st.fill === 'solid' ? 'none' : '');
     $$('.qx-gl').forEach(e => e.style.display = st.fill === 'linear' ? '' : 'none');
     $$('.qx-e').forEach(e => e.style.display = st.customEye ? '' : 'none');
+    root.querySelector('[data-mlabel]').textContent = st.margin + ' 格';
     root.querySelector('[data-logopv]').innerHTML = st.logo ? `<img src="${st.logo}">` : '<span style="color:#bbb;font-size:12px">無</span>';
   }
   const fire = () => { sync(); opts.onChange && opts.onChange(Object.assign({}, st)); };
@@ -362,9 +374,10 @@ function editor(root, opts){
     r.onload = () => {
       const img = new Image();
       img.onload = () => {
-        const max = opts.logoMax || 240, s = Math.min(1, max / Math.max(img.width, img.height));
+        const max = opts.logoMax || 600, s = Math.min(1, max / Math.max(img.width, img.height));
         const c = document.createElement('canvas'); c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
-        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        const cx = c.getContext('2d'); cx.imageSmoothingEnabled = true; cx.imageSmoothingQuality = 'high';
+        cx.drawImage(img, 0, 0, c.width, c.height);
         let url = c.toDataURL('image/png');
         if (opts.logoLimit && url.length > opts.logoLimit) url = c.toDataURL('image/jpeg', 0.85);
         st.logo = url; fire();
