@@ -2378,7 +2378,7 @@ function build(text, st){
   st = Object.assign({}, DEFAULT, st || {});
   const order = ['L','M','Q','H'];
   let ec = order.indexOf(st.ec) < 0 ? 1 : order.indexOf(st.ec);
-  if (st.logo) ec = Math.max(ec, (+st.logoSize || 0.22) > 0.22 ? 3 : 2); // 有 logo 時自動提高容錯
+  if (st.logo) ec = Math.max(ec, 1); // 有 logo 時至少「標準」，其餘由使用者決定
   const q = qrcode(0, order[ec]); q.addData(text || ' '); q.make();
   const n = q.getModuleCount(), Q = Math.max(1, Math.min(8, Math.round(+st.margin >= 0 ? +st.margin : 4))), S = n + Q*2;
   const dark = (r, c) => r >= 0 && c >= 0 && r < n && c < n && q.isDark(r, c);
@@ -2533,6 +2533,11 @@ function warnings(st){
   const worst = Math.min.apply(null, cols.map(c => contrast(c, bg)));
   if (worst < 3) return '⚠️ 顏色對比太低，可能掃不到';
   if (cols.some(c => lum(c) > lum(bg))) return '⚠️ 淺色點配深色底，部分手機可能掃不到';
+  if (st.logo){
+    const e = ['L','M','Q','H'].indexOf(st.ec) < 0 ? 1 : ['L','M','Q','H'].indexOf(st.ec), sz = +st.logoSize || 0.22;
+    if (e <= 1 && sz > 0.2) return '⚠️ logo 偏大、容錯率偏低，可能掃不到：請縮小 logo，或把密度調到「較密」';
+    if (e <= 1) return '容錯率較低：下載後請務必用手機實際掃描測試';
+  }
   if (st.transparent) return '透明背景：請放在淺色底上使用';
   return '';
 }
@@ -2616,7 +2621,7 @@ function editor(root, opts){
       <div class="qx-h">點的密度（容錯率）</div>
       ${seg('ec', [['L','最疏'],['M','標準'],['Q','較密'],['H','最密']])}
       <div class="qx-note" data-ecinfo></div>
-      <div class="qx-note">越疏點越少、越好掃，但比較不耐髒污折損；加 logo 時會自動調到「較密」以上。網址越短，點也會越少。</div>
+      <div class="qx-note">越疏點越少、越好掃，但比較不耐髒污折損；加 logo 時最低為「標準」。網址越短，點也會越少。</div>
       <div class="qx-h">四周留白</div>
       <div class="qx-row" style="margin:4px 0"><label data-mlabel></label><input type="range" min="1" max="8" step="1" data-r="margin"></div>
       <div class="qx-note">建議至少 2 格，印刷時旁邊有其他圖文就留 4 格。</div>
@@ -2668,7 +2673,7 @@ function editor(root, opts){
       root.querySelectorAll('.qx-seg[data-k="ec"] button').forEach(b => { b.textContent = names[b.dataset.v] + (info[b.dataset.v] ? ' ' + info[b.dataset.v] + '×' + info[b.dataset.v] : ''); });
       const same = info.L === info.M || info.M === info.Q;
       root.querySelector('[data-ecinfo]').textContent =
-        (st.logo ? '有 logo 時會自動提高到「較密」以上，所以前幾個選項結果一樣。' : '')
+        (st.logo ? '有 logo 時最低為「標準」；logo 越大，建議選越密。' : '')
         + (same ? '格數一樣代表這段網址剛好落在同一個尺寸，圖案只會有些微不同；網址再短一點，差異才會出來。' : '');
     }
     root.querySelector('[data-logopv]').innerHTML = st.logo ? `<img src="${st.logo}">` : '<span style="color:#bbb;font-size:12px">無</span>';
