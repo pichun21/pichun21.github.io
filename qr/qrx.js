@@ -2549,27 +2549,30 @@ function normalize(st){ // 相容舊版設定
 /* ---------- 編輯器 ---------- */
 const CSS = `
 .qx{font-size:14px}
-.qx-tabs{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid #e6e3dc;margin-bottom:12px;-webkit-overflow-scrolling:touch}
-.qx-tabs button{background:none;border:0;border-bottom:3px solid transparent;color:#666;padding:9px 12px;font:inherit;white-space:nowrap;cursor:pointer;border-radius:0}
-.qx-tabs button.on{color:#3d6b5a;border-bottom-color:#3d6b5a;font-weight:700}
+.qx-tabs{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid #e6e2da;margin-bottom:12px;-webkit-overflow-scrolling:touch}
+.qx-tabs button{background:none;border:0;border-bottom:2px solid transparent;color:#4a524e;padding:9px 12px;font-weight:500;font:inherit;white-space:nowrap;cursor:pointer;border-radius:0}
+.qx-tabs button.on{color:#2f5d4e;border-bottom-color:#2f5d4e;font-weight:700}
 .qx-pane{display:none}.qx-pane.on{display:block}
 .qx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:8px}
-.qx-opt{background:#fff;border:2px solid #e6e3dc;border-radius:10px;padding:6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;color:#555}
-.qx-opt.on{border-color:#3d6b5a;background:#f1f7f4;color:#2a4a3e;font-weight:700}
+.qx-opt{background:#fff;border:1.5px solid #e6e2da;border-radius:12px;padding:8px 6px 6px;transition:border-color .15s,background .15s;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;color:#555}
+.qx-opt.on{border-color:#2f5d4e;background:#e7efeb;color:#244a3e;font-weight:700}
 .qx-opt svg{width:100%;height:auto;max-width:72px}
 .qx-row{display:grid;grid-template-columns:96px 1fr;gap:10px;align-items:center;margin:10px 0}
 .qx-row label{color:#555}
-.qx input[type=color]{width:56px;height:36px;padding:2px;border:1px solid #e6e3dc;border-radius:8px;background:#fff}
-.qx input[type=text]{width:100%;padding:8px 10px;border:1px solid #e6e3dc;border-radius:8px;font:inherit}
+.qx input[type=color]{width:56px;height:36px;padding:2px;border:1px solid #e6e2da;border-radius:8px;background:#fff}
+.qx input[type=text]{width:100%;padding:8px 10px;border:1px solid #e6e2da;border-radius:8px;font:inherit}
 .qx input[type=range]{width:100%}
 .qx-seg{display:flex;flex-wrap:wrap;gap:6px}
-.qx-seg button{background:#fff;color:#2b2b2b;border:1px solid #e6e3dc;border-radius:8px;padding:6px 11px;font:inherit;font-size:13px;cursor:pointer}
-.qx-seg button.on{background:#3d6b5a;color:#fff;border-color:#3d6b5a}
+.qx-seg button{background:#fff;color:#2b2b2b;border:1px solid #e6e2da;border-radius:8px;padding:6px 11px;font:inherit;font-size:13px;cursor:pointer}
+.qx-seg button.on{background:#2f5d4e;color:#fff;border-color:#2f5d4e}
 .qx-h{font-weight:700;margin:14px 0 6px;color:#333}
 .qx-note{color:#888;font-size:12px;margin-top:6px}
 .qx-logo{display:flex;gap:10px;align-items:center}
 .qx-logo .pv{width:56px;height:56px;border:1px dashed #ccc;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#fafafa}
 .qx-logo .pv img{max-width:100%;max-height:100%}
+
+.qx-opt:hover{border-color:#d9d4ca;background:#faf9f6}
+.qx input[type=range]{accent-color:#2f5d4e}
 `;
 
 function editor(root, opts){
