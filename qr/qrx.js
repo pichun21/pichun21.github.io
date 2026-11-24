@@ -2306,7 +2306,7 @@ const DEFAULT = {
   fill:'solid', fg:'#000000', fg2:'#3d6b5a', angle:45,
   customEye:false, eyeOuterColor:'#000000', eyeInnerColor:'#000000',
   bg:'#ffffff', transparent:false,
-  logo:'', logoSize:0.22, logoPlate:true, ec:'M', margin:4,
+  logo:'', logoSize:0.22, logoPlate:true, ec:'M', margin:4, dotSize:1,
   frame:'none', frameColor:'#000000', frameText:'SCAN ME'
 };
 
@@ -2372,7 +2372,7 @@ function eyeInnerPath(shape, x, y){
 }
 
 /* ---------- 產生 SVG ---------- */
-let GID = 0;
+let GID = 0, LAST = null;
 function build(text, st){
   const gid = 'qg' + (++GID) + Math.random().toString(36).slice(2, 6);
   st = Object.assign({}, DEFAULT, st || {});
@@ -2396,6 +2396,7 @@ function build(text, st){
 
   // 點
   let d = '';
+  const K = Math.max(0.5, Math.min(1, +st.dotSize || 1));
   const P = st.pattern;
   if (P === 'vbar' || P === 'hbar'){
     for (let a = 0; a < n; a++){
@@ -2406,7 +2407,8 @@ function build(text, st){
         if (isOn && start < 0) start = b;
         if (!isOn && start >= 0){
           const len = b - start;
-          d += P === 'vbar' ? rr(Q+a+0.1, Q+start+0.05, 0.8, len-0.1, 0.4) : rr(Q+start+0.05, Q+a+0.1, len-0.1, 0.8, 0.4);
+          const t = 0.8 * K, o = (1 - t) / 2;
+          d += P === 'vbar' ? rr(Q+a+o, Q+start+0.05, t, len-0.1, t/2) : rr(Q+start+0.05, Q+a+o, len-0.1, t, t/2);
           start = -1;
         }
       }
@@ -2415,18 +2417,20 @@ function build(text, st){
     for (let r = 0; r < n; r++) for (let c = 0; c < n; c++){
       if (!on(r, c)) continue;
       const x = Q + c, y = Q + r;
+      const sq = (w, rad) => { const o = (1 - w * K) / 2; return rr(x + o, y + o, w * K, w * K, rad * K); };
       switch(P){
-        case 'small':   d += rr(x+0.12, y+0.12, 0.76, 0.76, 0); break;
-        case 'rounded': d += rr(x+0.05, y+0.05, 0.9, 0.9, 0.3); break;
-        case 'dot':     d += circ(x+0.5, y+0.5, 0.45); break;
-        case 'diamond': d += diam(x-0.02, y-0.02, 1.04); break;
-        case 'plus':    d += `M${x+0.3} ${y}h0.4v0.3h0.3v0.4h-0.3v0.3h-0.4v-0.3h-0.3v-0.4h0.3Z`; break;
-        case 'classy':  d += rr4(x+0.04, y+0.04, 0.92, 0.92, [0.42,0,0.42,0]); break;
+        case 'small':   d += sq(0.76, 0); break;
+        case 'rounded': d += sq(0.9, 0.3); break;
+        case 'dot':     d += circ(x+0.5, y+0.5, 0.45 * K); break;
+        case 'diamond': { const w = 1.04 * K, o = (1 - w) / 2; d += diam(x+o, y+o, w); break; }
+        case 'plus':    { const a = 0.3 * K, b = 0.4 * K, o = (1 - K) / 2, X0 = x + o, Y0 = y + o;
+                          d += `M${f(X0+a)} ${f(Y0)}h${f(b)}v${f(a)}h${f(a)}v${f(b)}h${f(-a)}v${f(a)}h${f(-b)}v${f(-a)}h${f(-a)}v${f(-b)}h${f(a)}Z`; break; }
+        case 'classy':  { const w = 0.92 * K, o = (1 - w) / 2; d += rr4(x+o, y+o, w, w, [0.42*K,0,0.42*K,0]); break; }
         case 'connected': {
           const u = on(r-1,c), dn = on(r+1,c), l = on(r,c-1), rt = on(r,c+1), R = 0.5;
           d += rr4(x, y, 1, 1, [(!u&&!l)?R:0, (!u&&!rt)?R:0, (!dn&&!rt)?R:0, (!dn&&!l)?R:0]); break;
         }
-        default: d += `M${x} ${y}h1v1h-1Z`;
+        default: d += K >= 1 ? `M${x} ${y}h1v1h-1Z` : sq(1, 0);
       }
     }
   }
@@ -2504,7 +2508,16 @@ function build(text, st){
     + (defs ? `<defs>${defs}</defs>` : '')
     + body
     + `<g transform="translate(${f(ox)} ${f(oy)})">${inner}</g></svg>`;
-  return { svg, w: W, h: H, n };
+  // logo 蓋住多少點（用來估算讀不到的風險）
+  let cov = 0;
+  if (lg){
+    let hidden = 0, total = 0;
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++){ if (inEye(r, c)) continue; total++; if (covered(r, c)) hidden++; }
+    cov = hidden / total;
+  }
+  const info = { n, ec: order[ec], cov, cap: { L:0.07, M:0.15, Q:0.25, H:0.30 }[order[ec]] };
+  LAST = info;
+  return { svg, w: W, h: H, n, info };
 }
 
 function toPNG(text, st, width, jpg){
@@ -2526,7 +2539,15 @@ function toPNG(text, st, width, jpg){
   });
 }
 
-function warnings(st){
+function logoRisk(info){
+  if (!info || !info.cov) return null;
+  const ratio = info.cov / info.cap;
+  const level = ratio < 0.45 ? 'ok' : ratio < 0.75 ? 'warn' : 'bad';
+  return { level, ratio, cov: Math.round(info.cov * 100), cap: Math.round(info.cap * 100),
+    text: 'logo 蓋住約 ' + Math.round(info.cov * 100) + '% 的點，目前容錯率最多可修復約 ' + Math.round(info.cap * 100) + '%',
+    label: level === 'ok' ? '風險低' : level === 'warn' ? '風險中：印刷有髒污或反光時可能讀不到' : '風險高：很可能讀不到，請縮小 logo 或調密' };
+}
+function warnings(st, info){
   st = Object.assign({}, DEFAULT, st || {});
   const bg = st.transparent ? '#ffffff' : st.bg;
   const cols = [st.fg].concat(st.fill !== 'solid' ? [st.fg2] : []).concat(st.customEye ? [st.eyeOuterColor, st.eyeInnerColor] : []);
@@ -2534,10 +2555,11 @@ function warnings(st){
   if (worst < 3) return '⚠️ 顏色對比太低，可能掃不到';
   if (cols.some(c => lum(c) > lum(bg))) return '⚠️ 淺色點配深色底，部分手機可能掃不到';
   if (st.logo){
-    const e = ['L','M','Q','H'].indexOf(st.ec) < 0 ? 1 : ['L','M','Q','H'].indexOf(st.ec), sz = +st.logoSize || 0.22;
-    if (e <= 1 && sz > 0.2) return '⚠️ logo 偏大、容錯率偏低，可能掃不到：請縮小 logo，或把密度調到「較密」';
-    if (e <= 1) return '容錯率較低：下載後請務必用手機實際掃描測試';
+    const rk = logoRisk(info || LAST);
+    if (rk && rk.level === 'bad') return '⚠️ ' + rk.text + '，' + rk.label;
+    if (rk && rk.level === 'warn') return '⚠️ ' + rk.text + '，' + rk.label;
   }
+  if ((+st.dotSize || 1) < 0.7) return '⚠️ 點縮得很小，遠距離或印刷較小時可能讀不到';
   if (st.transparent) return '透明背景：請放在淺色底上使用';
   return '';
 }
@@ -2592,6 +2614,13 @@ const CSS = `
 
 .qx-h,.qx-row label{color:#4e5548}
 .qx-opt.on{background:#f1efe3;border-color:#2e7a55;color:#2b2f27}
+
+.qx-risk{margin:6px 0 4px}
+.qx-meter{height:8px;border-radius:6px;background:#e7e3d2;overflow:hidden}
+.qx-meter i{display:block;height:100%;border-radius:6px;background:#2e7a55;transition:width .2s}
+.qx-meter.warn i{background:#c58a00}.qx-meter.bad i{background:#b42318}
+.qx-rt{font-size:12.5px;margin-top:6px;line-height:1.6;color:#2e7a55}
+.qx-rt.warn{color:#9a6700}.qx-rt.bad{color:#b42318}
 `;
 
 function editor(root, opts){
@@ -2621,7 +2650,9 @@ function editor(root, opts){
       <div class="qx-h">點的密度（容錯率）</div>
       ${seg('ec', [['L','最疏'],['M','標準'],['Q','較密'],['H','最密']])}
       <div class="qx-note" data-ecinfo></div>
-      <div class="qx-note">越疏點越少、越好掃，但比較不耐髒污折損；加 logo 時最低為「標準」。網址越短，點也會越少。</div>
+      <div class="qx-h">點的大小</div>
+      <div class="qx-row" style="margin:4px 0"><label data-dlabel></label><input type="range" min="0.5" max="1" step="0.05" data-r="dotSize"></div>
+      <div class="qx-note">點縮小後看起來比較疏、比較精緻，但太小會不好掃，建議 70% 以上。</div>
       <div class="qx-h">四周留白</div>
       <div class="qx-row" style="margin:4px 0"><label data-mlabel></label><input type="range" min="1" max="8" step="1" data-r="margin"></div>
       <div class="qx-note">建議至少 2 格，印刷時旁邊有其他圖文就留 4 格。</div>
@@ -2645,9 +2676,11 @@ function editor(root, opts){
       <div class="qx-logo"><div class="pv" data-logopv></div>
         <div class="qx-seg"><button type="button" data-act="pick">上傳圖片</button><button type="button" data-act="rm">移除</button></div>
         <input type="file" accept="image/*" data-file style="display:none"></div>
-      <div class="qx-row"><label>大小</label><input type="range" min="0.12" max="0.3" step="0.02" data-r="logoSize"></div>
+      <div class="qx-row"><label data-llabel>大小</label><input type="range" min="0.1" max="0.3" step="0.01" data-r="logoSize"></div>
+      <div class="qx-risk" data-risk></div>
+      <div class="qx-row"><label>容錯率</label>${seg('ec', [['M','標準'],['Q','較密'],['H','最密']])}</div>
       <div class="qx-row"><label>logo 底板</label>${seg('logoPlate', [['true','有'],['false','無']])}</div>
-      <div class="qx-note">加 logo 後會自動提高容錯率。logo 不要太大，下載後請實際掃描測試。</div>
+      <div class="qx-note">紅色代表很可能讀不到：把 logo 縮小，或把容錯率調高到紅字消失。正式印刷前請一定用手機實際掃過。</div>
     </div>
     <div class="qx-pane" data-p="frame">
       <div class="qx-grid">${FRAMES.map(([v,l]) => opt('frame', v, l, thumb({frame:v, frameText:'SCAN'}))).join('')}</div>
@@ -2666,6 +2699,15 @@ function editor(root, opts){
     $$('.qx-gl').forEach(e => e.style.display = st.fill === 'linear' ? '' : 'none');
     $$('.qx-e').forEach(e => e.style.display = st.customEye ? '' : 'none');
     root.querySelector('[data-mlabel]').textContent = st.margin + ' 格';
+    root.querySelector('[data-dlabel]').textContent = Math.round((+st.dotSize || 1) * 100) + '%';
+    root.querySelector('[data-llabel]').textContent = '大小 ' + Math.round((+st.logoSize || 0.22) * 100) + '%';
+    const rbox = root.querySelector('[data-risk]');
+    if (st.logo && opts.text){
+      const rk = logoRisk(build(opts.text() || ' ', Object.assign({}, st, { frame:'none' })).info);
+      const pct = Math.min(100, Math.round(rk.ratio * 100));
+      rbox.innerHTML = '<div class="qx-meter ' + rk.level + '"><i style="width:' + pct + '%"></i></div>'
+        + '<div class="qx-rt ' + rk.level + '"><b>' + rk.label + '</b><br>' + rk.text + '。</div>';
+    } else rbox.innerHTML = st.logo ? '' : '<div class="qx-note">上傳 logo 後，這裡會顯示讀不到的風險。</div>';
     if (opts.text){ // 顯示每個密度實際的格數
       const text = opts.text() || ' ', info = {};
       ['L','M','Q','H'].forEach(ec => { try { info[ec] = build(text, Object.assign({}, st, { ec, frame:'none' })).n; } catch (e) {} });
